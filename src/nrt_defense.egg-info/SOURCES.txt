@@ -1,9 +1,11 @@
 README.md
 pyproject.toml
 src/nrt_defense/__init__.py
+src/nrt_defense/cli.py
 src/nrt_defense.egg-info/PKG-INFO
 src/nrt_defense.egg-info/SOURCES.txt
 src/nrt_defense.egg-info/dependency_links.txt
+src/nrt_defense.egg-info/entry_points.txt
 src/nrt_defense.egg-info/requires.txt
 src/nrt_defense.egg-info/top_level.txt
 src/nrt_defense/core/__init__.py

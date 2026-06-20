@@ -22,6 +22,9 @@ dev = [
     "pytest-cov>=5.0.0",
 ]
 
+[project.scripts]
+nrt-audit = "nrt_defense.cli:main"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
