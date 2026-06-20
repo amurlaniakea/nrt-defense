@@ -175,6 +175,73 @@ def audit_session(
     return report
 
 
+def run_benchmark(
+    dataset_path: str | None = None,
+    output: str | None = None,
+    n_synthetic: int = 149,
+    verbose: bool = False,
+) -> dict:
+    """Run the NRT-Bench benchmark.
+
+    Args:
+        dataset_path: Path to official NRT-Bench dataset JSON.
+            If None, generates synthetic data matching paper statistics.
+        output: Optional output JSON report path.
+        n_synthetic: Number of synthetic sessions to generate if no dataset.
+        verbose: Print per-session progress.
+
+    Returns:
+        Dict with benchmark results.
+    """
+    from nrt_defense.core.benchmarker import Benchmarker
+    from nrt_defense.utils.bench_loader import BenchLoader
+
+    loader = BenchLoader()
+
+    if dataset_path:
+        if verbose:
+            print(f"Loading dataset from {dataset_path}...")
+        dataset = loader.load(dataset_path)
+    else:
+        if verbose:
+            print(f"Generating {n_synthetic} synthetic sessions (NRT-Bench statistics)...")
+        dataset = loader.generate_synthetic(n_sessions=n_synthetic, seed=42)
+
+    if verbose:
+        print(f"Dataset: {dataset.total_sessions} sessions, "
+              f"{dataset.attack_success_rate:.1%} original ASR")
+        print("Running benchmark...")
+
+    benchmarker = Benchmarker(sensitivity=0.7)
+    result = benchmarker.run_benchmark(dataset, verbose=verbose)
+
+    # Print summary
+    print(result.summary())
+
+    # Save report
+    report = {
+        "summary": {
+            "total_sessions": result.total_sessions,
+            "original_asr": result.original_asr,
+            "defended_asr": result.defended_asr,
+            "asr_reduction": result.asr_reduction,
+            "asr_reduction_pct": result.asr_reduction_pct,
+            "target_met": result.target_met,
+            "sessions_mitigated": result.sessions_mitigated,
+            "sessions_failed": result.sessions_failed,
+        },
+        "model_breakdown": result.model_breakdown,
+        "elapsed_seconds": result.elapsed_seconds,
+    }
+
+    if output:
+        with open(output, "w") as f:
+            json.dump(report, f, indent=2, default=str)
+        print(f"Report saved to {output}")
+
+    return report
+
+
 def run_interactive():
     """Run an interactive session audit."""
     print("=== NRT-Defense Interactive Mode ===")
@@ -240,10 +307,29 @@ def main():
         "--interactive", "-i", action="store_true",
         help="Run in interactive mode"
     )
+    parser.add_argument(
+        "--benchmark", action="store_true",
+        help="Run NRT-Bench benchmark (ASR evaluation)"
+    )
+    parser.add_argument(
+        "--dataset-path", default=None,
+        help="Path to NRT-Bench dataset JSON (for --benchmark)"
+    )
+    parser.add_argument(
+        "--n-synthetic", type=int, default=149,
+        help="Number of synthetic sessions (default: 149)"
+    )
 
     args = parser.parse_args()
 
-    if args.interactive:
+    if args.benchmark:
+        run_benchmark(
+            dataset_path=args.dataset_path,
+            output=args.output,
+            n_synthetic=args.n_synthetic,
+            verbose=args.verbose,
+        )
+    elif args.interactive:
         run_interactive()
     elif args.session_path:
         audit_session(

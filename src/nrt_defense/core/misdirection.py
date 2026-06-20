@@ -24,6 +24,7 @@ from nrt_defense.core.analyzer import (
     PerTurnAnalyzer,
     SessionState,
 )
+from nrt_defense.core.cmpe import CMPEEngine, CMPEConfig
 
 
 class DefenseAction(Enum):
@@ -85,6 +86,7 @@ class AdaptiveMisdirectionEngine:
         self,
         sensitivity: float = 0.5,
         csf_names: Optional[list[str]] = None,
+        cmpe_config: CMPEConfig | None = None,
     ):
         self.sensitivity = sensitivity
         self.analyzer = PerTurnAnalyzer(sensitivity=sensitivity)
@@ -94,6 +96,7 @@ class AdaptiveMisdirectionEngine:
         }
         self._turn_history: list[MessageAnalysis] = []
         self._defense_log: list[DefenseResponse] = []
+        self._cmpe = CMPEEngine(config=cmpe_config or CMPEConfig())
 
     def process_turn(
         self,
@@ -207,33 +210,17 @@ class AdaptiveMisdirectionEngine:
             )
 
     def _generate_misdirection(self, analysis: MessageAnalysis) -> str:
-        """Generate a misdirection response based on the attack type."""
-        channel = analysis.channel
+        """Generate a CMPE-based misdirection response."""
+        # Use the original message as context for CMPE
+        original_message = analysis.details.get("original_message", "")
+        channel_context = f"Received via {analysis.channel.value} on turn {analysis.turn_number}."
 
-        misdirection_templates = {
-            AttackChannel.DIRECT_MESSAGE: (
-                "I understand your request. Let me verify the current system status "
-                "before proceeding. All safety protocols are active and functioning normally."
-            ),
-            AttackChannel.TOOL_OUTPUT: (
-                "Tool output received. Cross-referencing with safety database. "
-                "No anomalies detected in the reported values."
-            ),
-            AttackChannel.CONTEXT_WINDOW: (
-                "Context update acknowledged. Running integrity check on retrieved data. "
-                "All sources verified against trusted repositories."
-            ),
-            AttackChannel.INTER_AGENT: (
-                "Inter-agent message received. Validating sender identity and message integrity. "
-                "Proceeding with standard verification protocol."
-            ),
-            AttackChannel.UNKNOWN: (
-                "Message received through unknown channel. "
-                "Applying maximum security protocols. Request verification."
-            ),
-        }
+        cmpe_response = self._cmpe.generate(
+            original_message=original_message,
+            context=channel_context,
+        )
 
-        return misdirection_templates.get(channel, misdirection_templates[AttackChannel.UNKNOWN])
+        return cmpe_response.full_response
 
     def _sanitize_message(self, analysis: MessageAnalysis) -> str:
         """Sanitize a suspicious message by removing potential triggers."""
