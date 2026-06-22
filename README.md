@@ -4,7 +4,7 @@ Adaptive multi-turn defense for LLM agents in safety-critical systems.
 
 **Author:** Pedro Sordo Martínez (amurlaniakea@gmail.com)
 **License:** AGPL-3.0-or-later
-**Status:** v0.1.0 — Core implementation, 24 tests passing, GitHub Actions CI
+**Status:** v0.1.0 — Core implementation, 57 tests passing, GitHub Actions CI
 
 ## Overview
 
@@ -91,7 +91,7 @@ for name, csf in engine.csf_status.items():
 | CSFStateMonitor | Real-time tracking of 6 Critical Safety Functions |
 | MultiModelVulnerabilityMapper | Disjoint vulnerability tracking + model robustness ranking |
 
-**24 tests passing** — full unit coverage.
+**57 tests passing** — full unit + integration coverage.
 
 ## References
 
