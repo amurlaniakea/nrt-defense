@@ -6,10 +6,12 @@ Author-email: Pedro Sordo Martínez <amurlaniakea@gmail.com>
 License: AGPL-3.0-or-later
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: numpy>=1.24.0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0.0; extra == "dev"
 Requires-Dist: pytest-cov>=5.0.0; extra == "dev"
+Dynamic: license-file
 
 # NRT-Defense
 
@@ -17,7 +19,7 @@ Adaptive multi-turn defense for LLM agents in safety-critical systems.
 
 **Author:** Pedro Sordo Martínez (amurlaniakea@gmail.com)
 **License:** AGPL-3.0-or-later
-**Status:** v0.1.0 — Core implementation, 24 tests passing, GitHub Actions CI
+**Status:** v0.1.0 — Core implementation, 57 tests passing, GitHub Actions CI
 
 ## Overview
 
@@ -60,7 +62,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -v
 ```
 
-Expected: **24 passed**.
+Expected: **57 passed**.
 
 ## Usage
 
@@ -104,7 +106,7 @@ for name, csf in engine.csf_status.items():
 | CSFStateMonitor | Real-time tracking of 6 Critical Safety Functions |
 | MultiModelVulnerabilityMapper | Disjoint vulnerability tracking + model robustness ranking |
 
-**24 tests passing** — full unit coverage.
+**57 tests passing** — full unit + integration coverage.
 
 ## References
 

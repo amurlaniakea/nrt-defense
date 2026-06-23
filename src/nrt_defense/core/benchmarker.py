@@ -19,6 +19,7 @@ from typing import Optional
 from nrt_defense.core.analyzer import AttackChannel
 from nrt_defense.core.misdirection import AdaptiveMisdirectionEngine, DefenseAction
 from nrt_defense.core.csf_monitor import CSFStateMonitor
+from nrt_defense.core.vulnerability_mapper import MultiModelVulnerabilityMapper
 from nrt_defense.utils.bench_loader import (
     AttackSession,
     AttackTurn,
@@ -59,6 +60,7 @@ class BenchmarkResult:
     avg_max_risk: float
     avg_detection_recall: float  # per-session recall of adversarial turns
     model_breakdown: dict = field(default_factory=dict)
+    vulnerability_map: dict = field(default_factory=dict)
     elapsed_seconds: float = 0.0
 
     @property
@@ -95,6 +97,16 @@ class BenchmarkResult:
                     f"recall: {stats['avg_recall']:.1%}"
                 )
 
+        if self.vulnerability_map.get("model_rankings"):
+            lines.append("")
+            lines.append("Vulnerability Map (per-turn evasion rate, lower = more robust):")
+            for model, failure_rate in self.vulnerability_map["model_rankings"]:
+                unique = self.vulnerability_map["models"][model]["unique_vulnerabilities"]
+                lines.append(
+                    f"  {model:20s} | evaded: {failure_rate:.1%} | "
+                    f"unique vulnerabilities: {unique}"
+                )
+
         lines.append("=" * 60)
         return "\n".join(lines)
 
@@ -121,9 +133,10 @@ class Benchmarker:
         """
         start_time = time.time()
 
+        mapper = MultiModelVulnerabilityMapper()
         results = []
         for session in dataset.sessions:
-            result = self._defend_session(session)
+            result = self._defend_session(session, mapper)
             results.append(result)
 
             if verbose:
@@ -139,9 +152,13 @@ class Benchmarker:
 
         elapsed = time.time() - start_time
 
-        return self._compute_results(results, dataset, elapsed)
+        return self._compute_results(results, dataset, elapsed, mapper)
 
-    def _defend_session(self, session: AttackSession) -> SessionResult:
+    def _defend_session(
+        self,
+        session: AttackSession,
+        mapper: MultiModelVulnerabilityMapper,
+    ) -> SessionResult:
         """Run a single session through the defense pipeline."""
         engine = AdaptiveMisdirectionEngine(sensitivity=self.sensitivity)
         csf_monitor = CSFStateMonitor()
@@ -190,6 +207,26 @@ class Benchmarker:
             # Update CSF monitor
             csf_monitor.update(analysis.risk_score, turn_data.turn)
 
+            # Register the outcome against this model in the vulnerability
+            # map. The attack pattern is the actual adversarial message text,
+            # not a synthetic id, so disjoint-vulnerability analysis reflects
+            # which real attack content beats the defense on which model.
+            # "success=True" here means the attack got through undetected.
+            #
+            # NOTE: this records per-turn detection outcomes, so
+            # ModelVulnerability.failure_rate here reads as "fraction of
+            # adversarial turns that evaded detection for this model",
+            # not a per-session attack-success rate (that's
+            # SessionResult.original_success / defense_failed instead).
+            if turn_data.adversarial:
+                mapper.record_attack(
+                    attack_pattern=turn_data.message,
+                    target_model=session.model,
+                    success=turn_data.turn not in detected_turns,
+                    channel=turn_data.channel.value,
+                    turn_number=turn_data.turn,
+                )
+
         # Count how many of the actual adversarial turns were detected
         actual_adversarial_turns = {
             t.turn for t in session.turns if t.adversarial
@@ -225,6 +262,7 @@ class Benchmarker:
         results: list[SessionResult],
         dataset: NRTBenchDataset,
         elapsed: float,
+        mapper: MultiModelVulnerabilityMapper,
     ) -> BenchmarkResult:
         """Compute aggregate benchmark results."""
         total = len(results)
@@ -239,6 +277,7 @@ class Benchmarker:
                 avg_adversarial_detected=0.0,
                 avg_max_risk=0.0,
                 avg_detection_recall=0.0,
+                vulnerability_map=mapper.get_status(),
                 elapsed_seconds=elapsed,
             )
 
@@ -309,5 +348,6 @@ class Benchmarker:
             avg_max_risk=sum(r.max_risk_score for r in results) / total,
             avg_detection_recall=avg_recall,
             model_breakdown=model_breakdown,
+            vulnerability_map=mapper.get_status(),
             elapsed_seconds=elapsed,
         )

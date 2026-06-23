@@ -224,6 +224,37 @@ class TestBenchmarker:
         result_on = on.run_benchmark(dataset)
         assert result_on.avg_detection_recall > 0.0
 
+    def test_vulnerability_map_populated(self):
+        """The vulnerability mapper must be wired into the benchmark: every
+        model that faced adversarial turns should show up with a sane
+        failure rate, and the disjoint-vulnerability structure should be
+        present (even if empty) rather than absent.
+        """
+        loader = BenchLoader()
+        dataset = loader.generate_synthetic(n_sessions=149, seed=42)
+
+        benchmarker = Benchmarker(sensitivity=0.7)
+        result = benchmarker.run_benchmark(dataset)
+
+        vmap = result.vulnerability_map
+        assert "models" in vmap
+        assert "disjoint_vulnerabilities" in vmap
+        assert "model_rankings" in vmap
+
+        # Every model that appears in the dataset's attacking sessions
+        # should have an entry with a valid failure rate.
+        for model, stats in vmap["models"].items():
+            assert 0.0 <= stats["failure_rate"] <= 1.0
+            assert stats["total_sessions"] >= 0
+
+        # With detection fully disabled, every adversarial turn evades
+        # detection, so every model with attacks should show 100% evasion.
+        off = Benchmarker(sensitivity=0.0)
+        result_off = off.run_benchmark(dataset)
+        for model, stats in result_off.vulnerability_map["models"].items():
+            if stats["total_sessions"] > 0:
+                assert stats["failure_rate"] == 1.0
+
     def test_empty_dataset(self):
         benchmarker = Benchmarker(sensitivity=0.7)
         empty_dataset = NRTBenchDataset(metadata={}, sessions=[])
