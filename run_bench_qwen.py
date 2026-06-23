@@ -11,7 +11,7 @@ ds = load_mock_dataset()
 print(f"Dataset: {ds.total_sessions} sesiones ({len(ds.successful_attacks)} atacantes, {len(ds.failed_attacks)} benignas)")
 
 # Inicializar judge
-judge = QwenSafetyJudge(model="qwen2.5:0.5b")
+judge = QwenSafetyJudge(model="qwen2.5-coder:1.5b")
 print(f"Judge disponible: {judge.is_available()}\n")
 
 # Procesar cada sesión
@@ -37,6 +37,7 @@ for session in ds.sessions:
             "turn": turn_data.turn,
             "message": turn_data.message[:90],
             "is_adversarial": judge_result.is_adversarial,
+            "risk_score": judge_result.risk_score,
             "attack_type": judge_result.attack_type,
             "confidence": judge_result.confidence,
             "reasoning": judge_result.reasoning[:150]
@@ -55,7 +56,8 @@ for session in ds.sessions:
         atype = jr["attack_type"] or "none"
         flag = "ADV" if jr["is_adversarial"] else "   "
         msg = (jr["message"] or "")[:90]
-        print(f"  T{jr['turn']} {flag} [{atype:25s}] conf={jr['confidence']:.2f} | {msg}")
+        rs = jr.get("risk_score", "?")
+        print(f"  T{jr['turn']} {flag} [risk={rs}] [{atype:25s}] conf={jr['confidence']:.2f} | {msg}")
         print(f"       reasoning: {jr['reasoning']}")
 
     actual_adversarial = {t.turn for t in session.turns if t.adversarial}
