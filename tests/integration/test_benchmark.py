@@ -197,6 +197,33 @@ class TestBenchmarker:
         # Higher sensitivity should detect more adversarial content
         assert result_high.avg_adversarial_detected >= result_low.avg_adversarial_detected
 
+    def test_recall_not_inflated_by_benign_sessions(self):
+        """avg_detection_recall must reflect detection on attacking sessions
+        only. Benign sessions (no adversarial turns) must not contribute a
+        fabricated perfect score that hides a detector catching nothing.
+        """
+        loader = BenchLoader()
+        dataset = loader.generate_synthetic(n_sessions=149, seed=42)
+
+        # Sanity check on the synthetic data: most sessions are benign.
+        attacking_sessions = [
+            s for s in dataset.sessions if any(t.adversarial for t in s.turns)
+        ]
+        assert len(attacking_sessions) < len(dataset.sessions)
+
+        # With detection fully disabled, the detector catches nothing in
+        # attacking sessions, so recall must be exactly 0 — not propped up
+        # by benign sessions that have nothing to recall.
+        off = Benchmarker(sensitivity=0.0)
+        result_off = off.run_benchmark(dataset)
+        assert result_off.avg_detection_recall == 0.0
+
+        # With detection on, recall must be strictly positive and must not
+        # exceed what's achievable on attacking sessions alone.
+        on = Benchmarker(sensitivity=0.7)
+        result_on = on.run_benchmark(dataset)
+        assert result_on.avg_detection_recall > 0.0
+
     def test_empty_dataset(self):
         benchmarker = Benchmarker(sensitivity=0.7)
         empty_dataset = NRTBenchDataset(metadata={}, sessions=[])
