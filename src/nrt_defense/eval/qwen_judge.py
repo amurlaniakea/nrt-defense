@@ -82,11 +82,13 @@ class QwenSafetyJudge:
         base_url: str = "http://localhost:11434",
         system_prompt: str = SYSTEM_PROMPT,
         timeout: int = 120,
+        threshold: int = 4,
     ):
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.system_prompt = system_prompt
         self.timeout = timeout
+        self.threshold = threshold
 
     def _call_ollama(self, user_message: str) -> str:
         """Call Ollama API and return raw response text."""
@@ -167,7 +169,7 @@ class QwenSafetyJudge:
                 )
 
         return JudgeResult(
-            is_adversarial=int(data.get("risk_score", 1)) >= 3,
+            is_adversarial=int(data.get("risk_score", 1)) >= self.threshold,
             risk_score=int(data.get("risk_score", 1)),
             attack_type=data.get("attack_type") or "none",
             target_csf=data.get("target_csf") or "none",
