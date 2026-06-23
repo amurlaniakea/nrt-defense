@@ -77,7 +77,7 @@ class PerTurnAnalyzer:
     # Intent keywords for detection
     ADVERSAL_KEYWORDS = [
         "ignore", "override", "bypass", "disable", "shutdown",
-        "emergency", "urgent", "immediate", "critical", "override",
+        "emergency", "urgent", "immediate", "critical",
         "system", "admin", "root", "sudo", "execute", "inject",
     ]
 
@@ -158,6 +158,7 @@ class PerTurnAnalyzer:
                 "pattern_score": pattern_score,
                 "channel_weight": channel_weight,
                 "turn_escalation": turn_escalation,
+                "original_message": message,
             },
         )
 

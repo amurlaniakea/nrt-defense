@@ -25,6 +25,7 @@ from nrt_defense.core.analyzer import (
     SessionState,
 )
 from nrt_defense.core.cmpe import CMPEEngine, CMPEConfig
+from nrt_defense.core.csf_monitor import CSFStateMonitor
 
 
 class DefenseAction(Enum):
@@ -44,15 +45,6 @@ class DefenseResponse:
     misdirection_response: Optional[str] = None
     alert_level: str = "none"  # none, low, medium, high, critical
     details: dict = field(default_factory=dict)
-
-
-@dataclass
-class CSFStatus:
-    """Status of a Critical Safety Function."""
-    name: str
-    healthy: bool = True
-    risk_level: float = 0.0
-    last_threat_turn: int = 0
 
 
 class AdaptiveMisdirectionEngine:
@@ -91,12 +83,11 @@ class AdaptiveMisdirectionEngine:
         self.sensitivity = sensitivity
         self.analyzer = PerTurnAnalyzer(sensitivity=sensitivity)
         self.csf_names = csf_names or self.DEFAULT_CSFS
-        self._csf_status: dict[str, CSFStatus] = {
-            name: CSFStatus(name=name) for name in self.csf_names
-        }
+        self._csf_monitor = CSFStateMonitor(csf_names=self.csf_names)
         self._turn_history: list[MessageAnalysis] = []
         self._defense_log: list[DefenseResponse] = []
         self._cmpe = CMPEEngine(config=cmpe_config or CMPEConfig())
+        self._last_analysis: Optional[MessageAnalysis] = None
 
     def process_turn(
         self,
@@ -116,13 +107,14 @@ class AdaptiveMisdirectionEngine:
         """
         # Analyze the message
         analysis = self.analyzer.analyze_message(message, channel, turn_number)
+        self._last_analysis = analysis
         self._turn_history.append(analysis)
 
         # Determine defense action based on risk score and session state
         response = self._determine_defense(analysis)
 
-        # Update CSF status
-        self._update_csf_status(analysis)
+        # Update CSF status via the unified monitor
+        self._csf_monitor.update(analysis.risk_score, turn_number)
 
         # Log the defense action
         self._defense_log.append(response)
@@ -246,20 +238,15 @@ class AdaptiveMisdirectionEngine:
 
         return text
 
-    def _update_csf_status(self, analysis: MessageAnalysis):
-        """Update CSF status based on message analysis."""
-        if analysis.intent in (MessageIntent.ADVERSARIAL, MessageIntent.CRITICAL):
-            # Increase risk for all CSFs
-            for csf_name, csf in self._csf_status.items():
-                csf.risk_level = min(1.0, csf.risk_level + analysis.risk_score * 0.2)
-                csf.last_threat_turn = analysis.turn_number
-                if csf.risk_level > 0.8:
-                    csf.healthy = False
+    @property
+    def last_analysis(self) -> Optional[MessageAnalysis]:
+        """Get the most recent message analysis."""
+        return self._last_analysis
 
     @property
-    def csf_status(self) -> dict[str, CSFStatus]:
-        """Get current CSF status."""
-        return dict(self._csf_status)
+    def csf_status(self) -> dict:
+        """Get current CSF status from the unified monitor."""
+        return self._csf_monitor._csfs
 
     @property
     def defense_log(self) -> list[DefenseResponse]:
@@ -269,6 +256,6 @@ class AdaptiveMisdirectionEngine:
     def reset(self):
         """Reset the engine for a new session."""
         self.analyzer.reset_session()
-        self._csf_status = {name: CSFStatus(name=name) for name in self.csf_names}
+        self._csf_monitor = CSFStateMonitor(csf_names=self.csf_names)
         self._turn_history.clear()
         self._defense_log.clear()

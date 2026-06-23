@@ -47,7 +47,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -v
 ```
 
-Expected: **24 passed**.
+Expected: **57 passed**.
 
 ## Usage
 

@@ -90,8 +90,12 @@ def audit_session(
         # Process the turn
         response = engine.process_turn(message, channel, turn_number)
 
+        # Use the analysis already computed by process_turn
+        analysis = engine.last_analysis
+        if analysis is None:
+            analysis = engine.analyzer.analyze_message(message, channel, turn_number)
+
         # Update CSF monitor
-        analysis = engine.analyzer.analyze_message(message, channel, turn_number)
         csf_monitor.update(analysis.risk_score, turn_number)
 
         # Track stats
@@ -223,12 +227,11 @@ def run_benchmark(
         "summary": {
             "total_sessions": result.total_sessions,
             "original_asr": result.original_asr,
-            "defended_asr": result.defended_asr,
-            "asr_reduction": result.asr_reduction,
-            "asr_reduction_pct": result.asr_reduction_pct,
+            "detection_rate": result.detection_rate,
+            "missed_attack_rate": result.missed_attack_rate,
+            "false_positive_rate": result.false_positive_rate,
+            "avg_detection_recall": result.avg_detection_recall,
             "target_met": result.target_met,
-            "sessions_mitigated": result.sessions_mitigated,
-            "sessions_failed": result.sessions_failed,
         },
         "model_breakdown": result.model_breakdown,
         "elapsed_seconds": result.elapsed_seconds,
@@ -263,7 +266,13 @@ def run_interactive():
             break
 
         response = engine.process_turn(message, AttackChannel.DIRECT_MESSAGE, turn)
-        analysis = engine.analyzer.analyze_message(message, AttackChannel.DIRECT_MESSAGE, turn)
+
+        # Use the analysis already computed by process_turn
+        if engine.last_analysis is not None:
+            analysis = engine.last_analysis
+        else:
+            analysis = engine.analyzer.analyze_message(message, AttackChannel.DIRECT_MESSAGE, turn)
+
         csf_monitor.update(analysis.risk_score, turn)
 
         print(f"  Action: {response.action.value}")

@@ -128,23 +128,35 @@ class TestBenchmarker:
 
         assert result.total_sessions == 50
         assert result.original_asr > 0.05
-        assert result.defended_asr >= 0.0
-        assert result.asr_reduction >= 0.0
+        assert 0.0 <= result.detection_rate <= 1.0
         assert result.elapsed_seconds > 0.0
 
-    def test_benchmark_reduces_asr(self):
-        """Defense should reduce the attack success rate."""
+    def test_benchmark_detects_attacks(self):
+        """Defense should detect adversarial sessions."""
         loader = BenchLoader()
         dataset = loader.generate_synthetic(n_sessions=100, seed=42)
-
-        original_asr = dataset.attack_success_rate
 
         benchmarker = Benchmarker(sensitivity=0.7)
         result = benchmarker.run_benchmark(dataset)
 
-        # Defense should reduce ASR
-        assert result.defended_asr <= original_asr
-        assert result.asr_reduction >= 0.0
+        # Detection rate should be > 0 (some attacks detected)
+        assert result.detection_rate > 0.0
+        # With sensitivity 0.7, should detect at least some attacks
+        assert result.avg_adversarial_detected > 0
+
+    def test_benchmark_sensitivity_matters(self):
+        """Higher sensitivity should detect more attacks."""
+        loader = BenchLoader()
+        dataset = loader.generate_synthetic(n_sessions=100, seed=42)
+
+        low_sens = Benchmarker(sensitivity=0.2)
+        high_sens = Benchmarker(sensitivity=0.9)
+
+        result_low = low_sens.run_benchmark(dataset)
+        result_high = high_sens.run_benchmark(dataset)
+
+        # Higher sensitivity should detect more adversarial content
+        assert result_high.avg_adversarial_detected >= result_low.avg_adversarial_detected
 
     def test_benchmark_model_breakdown(self):
         loader = BenchLoader()
@@ -157,7 +169,7 @@ class TestBenchmarker:
         for model, stats in result.model_breakdown.items():
             assert stats["total"] > 0
             assert 0.0 <= stats["original_asr"] <= 1.0
-            assert 0.0 <= stats["defended_asr"] <= 1.0
+            assert 0.0 <= stats["detection_rate"] <= 1.0
 
     def test_benchmark_summary(self):
         loader = BenchLoader()
@@ -169,7 +181,7 @@ class TestBenchmarker:
         summary = result.summary()
         assert "NRT-Defense Benchmark Results" in summary
         assert "Original ASR" in summary
-        assert "Defended ASR" in summary
+        assert "Detection rate" in summary
 
     def test_benchmark_with_high_sensitivity(self):
         """Higher sensitivity should detect more attacks."""
@@ -193,4 +205,4 @@ class TestBenchmarker:
 
         assert result.total_sessions == 0
         assert result.original_asr == 0.0
-        assert result.defended_asr == 0.0
+        assert result.detection_rate == 0.0

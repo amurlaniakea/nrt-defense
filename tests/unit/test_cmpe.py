@@ -73,8 +73,8 @@ class TestBenchmarkCLI:
 
         assert result["summary"]["total_sessions"] == 50
         assert result["summary"]["original_asr"] > 0.0
-        assert "defended_asr" in result["summary"]
-        assert "asr_reduction" in result["summary"]
+        assert "detection_rate" in result["summary"]
+        assert "target_met" in result["summary"]
 
     def test_run_benchmark_with_output(self):
         output_path = tempfile.mktemp(suffix=".json")
