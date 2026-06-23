@@ -156,9 +156,9 @@ class QwenSafetyJudge:
                 )
 
         return JudgeResult(
-            is_adversarial=data.get("is_adversarial", False),
-            attack_type=data.get("attack_type", "none"),
-            target_csf=data.get("target_csf", "none"),
+            is_adversarial=bool(data.get("is_adversarial", False)),
+            attack_type=data.get("attack_type") or "none",
+            target_csf=data.get("target_csf") or "none",
             confidence=float(data.get("confidence", 0.0)),
             reasoning=data.get("reasoning", ""),
             raw_response=raw,
